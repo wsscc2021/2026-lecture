@@ -64,11 +64,31 @@
 ### Observability
 
 - Observability 기본 개념
+- Logs, Metrics, Trace의 각 개념과 차이점
+- SLI, SLO, SLA 개념
+- Alerting
 
 ### Monitoring
 
+- RED 패턴, USE 패턴
+- 서비스 수준 모니터링
+- 리소스 수준 모니터링
+- 쿠버네티스 주요 모니터링 요소
+- 데이터베이스 주요 모니터링 요소
+
 ### Logging
 
-### Tracing
+- 로그 종류와 레벨
+- EFK 스택
+- Fluentbit, Fluentd 차이점
+- back-pressure 현상
 
 ## 4일차
+
+### Load Test
+
+- 로드 테스트, 성능 테스트, 스트레스 테스트, 스파이크 테스트 차이
+- TPS/RPS, Latency, Error Rate, Timeout 해석
+- 모니터링 지표 분석
+- 로드 테스트 결과 기반 병목 원인 추정
+- k6 기반 로드테스트 실습

@@ -3,13 +3,13 @@
 03 CPU Load — CPU 부하 발생 애플리케이션
 
 Endpoints:
-  GET /              현재 CPU 부하 상태 조회
-  POST /load         CPU 부하 시작
-                     body: {"duration": 30, "workers": 2}
-                       duration: 부하 지속 시간(초), 기본 30
-                       workers:  병렬 워커 수, 기본 CPU 코어 수
-  POST /stop         실행 중인 모든 부하 중지
-  GET  /health       헬스체크
+  GET  /cpu         현재 CPU 부하 상태 조회
+  POST /cpu/load    CPU 부하 시작
+                    body: {"duration": 30, "workers": 2}
+                      duration: 부하 지속 시간(초), 기본 30
+                      workers:  병렬 워커 수, 기본 CPU 코어 수
+  POST /cpu/stop    실행 중인 모든 부하 중지
+  GET  /health      헬스체크
 
 모니터링:
   top               → %Cpu us 항목 확인
@@ -37,7 +37,7 @@ def _cpu_burn(duration: int) -> None:
         _ = sum(i * i for i in range(5000))
 
 
-@app.route("/")
+@app.route("/cpu")
 def index():
     alive = [p for p in _workers if p.is_alive()]
     return jsonify({
@@ -47,7 +47,7 @@ def index():
     })
 
 
-@app.route("/load", methods=["POST"])
+@app.route("/cpu/load", methods=["POST"])
 def start_load():
     body     = request.get_json(force=True) or {}
     duration = int(body.get("duration", 30))
@@ -72,7 +72,7 @@ def start_load():
     })
 
 
-@app.route("/stop", methods=["POST"])
+@app.route("/cpu/stop", methods=["POST"])
 def stop_load():
     stopped = 0
     for p in _workers:

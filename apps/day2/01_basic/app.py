@@ -3,10 +3,10 @@
 01 Basic — 기본 응답 애플리케이션
 
 Endpoints:
-  GET /         hostname, timestamp, 요청 정보 반환
-  GET /health   헬스체크 (K8s Liveness/Readiness Probe용)
-  GET /env      컨테이너 환경변수 (Pod 이름·네임스페이스 확인에 유용)
-  GET /headers  요청 헤더 에코
+  GET /basic          hostname, timestamp, 요청 정보 반환
+  GET /health         헬스체크 (K8s Liveness/Readiness Probe용)
+  GET /basic/env      컨테이너 환경변수 (Pod 이름·네임스페이스 확인에 유용)
+  GET /basic/headers  요청 헤더 에코
 """
 
 import datetime
@@ -21,7 +21,7 @@ SERVICE_NAME = os.environ.get("SERVICE_NAME", "basic-app")
 VERSION      = os.environ.get("VERSION", "1.0.0")
 
 
-@app.route("/")
+@app.route("/basic")
 def index():
     return jsonify({
         "service":   SERVICE_NAME,
@@ -37,12 +37,12 @@ def health():
     return jsonify({"status": "ok", "service": SERVICE_NAME})
 
 
-@app.route("/env")
+@app.route("/basic/env")
 def env():
     return jsonify(dict(os.environ))
 
 
-@app.route("/headers")
+@app.route("/basic/headers")
 def headers():
     return jsonify(dict(request.headers))
 

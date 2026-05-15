@@ -18,12 +18,12 @@
   DB_NAME     (기본: demo)
 
 Endpoints:
-  GET  /users          전체 사용자 목록
-  POST /users          사용자 생성  body: {"name": "...", "email": "..."}
-  GET  /users/<id>     특정 사용자 조회
-  PUT  /users/<id>     사용자 수정  body: {"name": "...", "email": "..."}
-  DELETE /users/<id>   사용자 삭제
-  GET  /health         DB 연결 상태 포함 헬스체크
+  GET  /mysql/users          전체 사용자 목록
+  POST /mysql/users          사용자 생성  body: {"name": "...", "email": "..."}
+  GET  /mysql/users/<id>     특정 사용자 조회
+  PUT  /mysql/users/<id>     사용자 수정  body: {"name": "...", "email": "..."}
+  DELETE /mysql/users/<id>   사용자 삭제
+  GET  /health               DB 연결 상태 포함 헬스체크
 """
 
 import os
@@ -48,7 +48,7 @@ def get_conn():
 
 # ── Users ──────────────────────────────────────────────────────────────────
 
-@app.route("/users", methods=["GET"])
+@app.route("/mysql/users", methods=["GET"])
 def list_users():
     conn = get_conn()
     cur  = conn.cursor(dictionary=True)
@@ -58,7 +58,7 @@ def list_users():
     return jsonify(rows)
 
 
-@app.route("/users", methods=["POST"])
+@app.route("/mysql/users", methods=["POST"])
 def create_user():
     body = request.get_json(force=True)
     name  = body.get("name", "").strip()
@@ -77,7 +77,7 @@ def create_user():
     return jsonify(user), 201
 
 
-@app.route("/users/<int:user_id>", methods=["GET"])
+@app.route("/mysql/users/<int:user_id>", methods=["GET"])
 def get_user(user_id):
     conn = get_conn()
     cur  = conn.cursor(dictionary=True)
@@ -89,7 +89,7 @@ def get_user(user_id):
     return jsonify(user)
 
 
-@app.route("/users/<int:user_id>", methods=["PUT"])
+@app.route("/mysql/users/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
     body  = request.get_json(force=True)
     name  = body.get("name", "").strip()
@@ -110,7 +110,7 @@ def update_user(user_id):
     return jsonify(user)
 
 
-@app.route("/users/<int:user_id>", methods=["DELETE"])
+@app.route("/mysql/users/<int:user_id>", methods=["DELETE"])
 def delete_user(user_id):
     conn = get_conn()
     cur  = conn.cursor()

@@ -3,14 +3,14 @@
 04 Memory Load — 메모리 부하 발생 애플리케이션
 
 Endpoints:
-  GET /                현재 메모리 사용량 조회
-  POST /allocate       지정한 크기만큼 메모리 할당 (유지)
-                       body: {"mb": 256}
-  POST /release        할당된 메모리 전체 해제
-  POST /leak           메모리 누수 시뮬레이션 (해제 없이 계속 할당)
-                       body: {"mb": 50, "interval": 1}
-  POST /leak/stop      누수 시뮬레이션 중지
-  GET  /health         헬스체크
+  GET  /memory               현재 메모리 사용량 조회
+  POST /memory/allocate      지정한 크기만큼 메모리 할당 (유지)
+                             body: {"mb": 256}
+  POST /memory/release       할당된 메모리 전체 해제
+  POST /memory/leak          메모리 누수 시뮬레이션 (해제 없이 계속 할당)
+                             body: {"mb": 50, "interval": 1}
+  POST /memory/leak/stop     누수 시뮬레이션 중지
+  GET  /health               헬스체크
 
 모니터링:
   top               → RES, %MEM 항목 확인
@@ -66,12 +66,12 @@ def _memory_info() -> dict:
     return info
 
 
-@app.route("/")
+@app.route("/memory")
 def index():
     return jsonify({"service": "memory-load", **_memory_info()})
 
 
-@app.route("/allocate", methods=["POST"])
+@app.route("/memory/allocate", methods=["POST"])
 def allocate():
     body = request.get_json(force=True) or {}
     mb   = int(body.get("mb", 256))
@@ -87,7 +87,7 @@ def allocate():
     return jsonify({"status": "allocated", "mb": mb, **_memory_info()})
 
 
-@app.route("/release", methods=["POST"])
+@app.route("/memory/release", methods=["POST"])
 def release():
     count = len(_allocated)
     _allocated.clear()
@@ -103,7 +103,7 @@ def _leak_worker(mb_per_step: int, interval: float) -> None:
         _leak_stop.wait(timeout=interval)
 
 
-@app.route("/leak", methods=["POST"])
+@app.route("/memory/leak", methods=["POST"])
 def start_leak():
     global _leak_thread
     body     = request.get_json(force=True) or {}
@@ -111,7 +111,7 @@ def start_leak():
     interval = float(body.get("interval", 1.0))
 
     if _leak_thread and _leak_thread.is_alive():
-        return jsonify({"error": "leak already running — POST /leak/stop first"}), 409
+        return jsonify({"error": "leak already running — POST /memory/leak/stop first"}), 409
 
     _leak_stop.clear()
     _leak_thread = threading.Thread(
@@ -121,7 +121,7 @@ def start_leak():
     return jsonify({"status": "leak started", "mb_per_step": mb, "interval_sec": interval})
 
 
-@app.route("/leak/stop", methods=["POST"])
+@app.route("/memory/leak/stop", methods=["POST"])
 def stop_leak():
     _leak_stop.set()
     return jsonify({"status": "leak stopped", **_memory_info()})

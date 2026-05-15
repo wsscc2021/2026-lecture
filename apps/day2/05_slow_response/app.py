@@ -7,21 +7,22 @@ K8s Readiness Probe 타임아웃, Load Balancer 연결 제한,
 클라이언트 타임아웃 설정 실습에 활용한다.
 
 Endpoints:
-  GET /              40초 후 응답 (기본 지연)
-  GET /slow          지연 시간 직접 지정  ?seconds=N  (기본 40)
-  GET /fast          즉시 응답 (비교용)
-  GET /health        즉시 응답 (Probe 동작 확인용)
+  GET /slow           40초 후 응답 (기본 지연)
+  GET /slow/custom    지연 시간 직접 지정  ?seconds=N  (기본 40)
+  GET /slow/fast      즉시 응답 (비교용)
+  GET /health         즉시 응답 (Probe 동작 확인용)
 
 실습 포인트:
   # 기본 40초 응답 확인
-  curl -w "\nTotal: %{time_total}s\n" http://localhost:5000/
+  curl -w "\nTotal: %{time_total}s\n" http://localhost:5000/slow
 
   # 타임아웃 설정 실습
-  curl --max-time 5 http://localhost:5000/        # 5초 후 타임아웃
-  curl --max-time 5 http://localhost:5000/fast    # 즉시 성공
+  curl --max-time 5 http://localhost:5000/slow         # 5초 후 타임아웃
+  curl --max-time 5 http://localhost:5000/slow/fast    # 즉시 성공
+  curl http://localhost:5000/health                    # Probe 경로 확인
 
-  # K8s Readiness Probe 미통과 → 트래픽 차단 시뮬레이션
-  curl http://localhost:5000/slow?seconds=0       # 즉시 응답으로 전환
+  # 지연 시간 직접 지정
+  curl http://localhost:5000/slow/custom?seconds=10
 """
 
 import os
@@ -34,7 +35,7 @@ app = Flask(__name__)
 DEFAULT_DELAY = float(os.environ.get("DEFAULT_DELAY", 40))
 
 
-@app.route("/")
+@app.route("/slow")
 def index():
     start = time.monotonic()
     time.sleep(DEFAULT_DELAY)
@@ -47,8 +48,8 @@ def index():
     })
 
 
-@app.route("/slow")
-def slow():
+@app.route("/slow/custom")
+def custom():
     seconds = float(request.args.get("seconds", DEFAULT_DELAY))
     seconds = max(0.0, min(seconds, 300.0))  # 최대 5분으로 제한
     start   = time.monotonic()
@@ -61,7 +62,7 @@ def slow():
     })
 
 
-@app.route("/fast")
+@app.route("/slow/fast")
 def fast():
     return jsonify({
         "service": "slow-response",
