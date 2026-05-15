@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memory-load
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memory-load
+  template:
+    metadata:
+      labels:
+        app: memory-load
+    spec:
+      containers:
+      - name: memory-load
+        image: REGISTRY/day2-04-memory-load:latest
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi  # 메모리 할당 실습을 위해 limit을 높게 설정
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 10

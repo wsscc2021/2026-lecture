@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-ingress
+  namespace: demo
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - path: /basic
+        pathType: Prefix
+        backend:
+          service:
+            name: basic
+            port:
+              number: 80
+      - path: /mysql
+        pathType: Prefix
+        backend:
+          service:
+            name: mysql-app
+            port:
+              number: 80
+      - path: /cpu
+        pathType: Prefix
+        backend:
+          service:
+            name: cpu-load
+            port:
+              number: 80
+      - path: /memory
+        pathType: Prefix
+        backend:
+          service:
+            name: memory-load
+            port:
+              number: 80
+      - path: /slow
+        pathType: Prefix
+        backend:
+          service:
+            name: slow-response
+            port:
+              number: 80

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-load
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpu-load
+  template:
+    metadata:
+      labels:
+        app: cpu-load
+    spec:
+      containers:
+      - name: cpu-load
+        image: REGISTRY/day2-03-cpu-load:latest
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: "2"      # CPU 부하 실습을 위해 limit을 높게 설정
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 10

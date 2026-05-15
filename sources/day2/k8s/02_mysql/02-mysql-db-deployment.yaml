@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+        envFrom:
+        - secretRef:
+            name: mysql-secret
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+        readinessProbe:
+          exec:
+            command: ["mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pdemo"]
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          failureThreshold: 6
+        volumeMounts:
+        - name: initdb
+          mountPath: /docker-entrypoint-initdb.d
+        - name: data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: initdb
+        configMap:
+          name: mysql-initdb
+      - name: data
+        emptyDir: {}  # 데모용: Pod 재시작 시 데이터 초기화
