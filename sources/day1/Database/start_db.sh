@@ -22,14 +22,14 @@ docker run -d \
     --default-authentication-plugin=mysql_native_password
 
 echo "[*] MySQL 초기화 대기 중..."
-until docker exec "${CONTAINER}" mysqladmin ping -u root -p"${PASSWORD}" --silent 2>/dev/null; do
+until docker exec "${CONTAINER}" mysqladmin ping -h 127.0.0.1 -u root -p"${PASSWORD}" --silent 2>/dev/null; do
     printf '.'
     sleep 1
 done
 echo ""
 
 echo "[*] 스키마 및 초기 데이터 적재..."
-docker exec -i "${CONTAINER}" mysql -u root -p"${PASSWORD}" < setup.sql
+docker exec -i "${CONTAINER}" mysql -u root -h 127.0.0.1 -p"${PASSWORD}" < setup.sql
 
 echo ""
 echo "[완료] 접속 정보:"
