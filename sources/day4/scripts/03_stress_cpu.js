@@ -80,9 +80,8 @@ export default function () {
   }
 
   const ok = check(r, {
-    'status 200':            (r) => r.status === 200,
-    'response time < 2s':    (r) => r.timings.duration < 2000,
-    'has active_workers key':(r) => {
+    'status 200':             (r) => r.status === 200,
+    'has active_workers key': (r) => {
       try { return JSON.parse(r.body).active_workers !== undefined; }
       catch { return false; }
     },

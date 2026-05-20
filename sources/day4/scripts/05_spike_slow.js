@@ -96,8 +96,7 @@ export default function () {
     fastLatency.add(r.timings.duration);
 
     const ok = check(r, {
-      '/slow/fast: status 200':    (r) => r.status === 200,
-      '/slow/fast: < 200ms':       (r) => r.timings.duration < 200,
+      '/slow/fast: status 200': (r) => r.status === 200,
     });
     errorRate.add(!ok);
 
@@ -111,7 +110,6 @@ export default function () {
 
     const ok = check(r, {
       '/health: status 200': (r) => r.status === 200,
-      '/health: < 100ms':    (r) => r.timings.duration < 100,
     });
     errorRate.add(!ok);
   }

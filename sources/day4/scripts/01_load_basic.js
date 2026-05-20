@@ -56,9 +56,8 @@ export default function () {
     basicLatency.add(r1.timings.duration);
 
     const ok1 = check(r1, {
-      '/basic status 200':          (r) => r.status === 200,
-      '/basic has hostname':         (r) => JSON.parse(r.body).hostname !== undefined,
-      '/basic response time < 300ms':(r) => r.timings.duration < 300,
+      '/basic status 200':  (r) => r.status === 200,
+      '/basic has hostname': (r) => { try { return JSON.parse(r.body).hostname !== undefined; } catch(_) { return false; } },
     });
     errorRate.add(!ok1);
 

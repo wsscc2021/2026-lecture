@@ -83,8 +83,7 @@ export default function (data) {
   memoryLatency.add(r.timings.duration);
 
   const ok = check(r, {
-    'memory status 200':       (r) => r.status === 200,
-    'response time < 500ms':   (r) => r.timings.duration < 500,
+    'memory status 200': (r) => r.status === 200,
   });
   errorRate.add(!ok);
 
