@@ -1,0 +1,118 @@
+# CloudWatch Logs에 로그를 전송하기 위한 IAM 설정
+#
+# Fluent Bit → CloudWatch Logs 권한 흐름:
+#   EKS Pod → ServiceAccount → IRSA (IAM Role) → CloudWatch Logs
+#
+# IRSA(IAM Roles for Service Accounts)는 Pod에 AWS IAM 권한을 부여하는 EKS 메커니즘입니다.
+# EC2 인스턴스 프로파일 대신 ServiceAccount 단위로 최소 권한을 적용할 수 있습니다.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 1: IAM 정책 생성
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# 아래 JSON을 FluentBitCloudWatchPolicy.json 으로 저장한 뒤 AWS CLI로 생성합니다.
+#
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "logs:CreateLogGroup",
+#         "logs:CreateLogStream",
+#         "logs:PutLogEvents",
+#         "logs:DescribeLogGroups",
+#         "logs:DescribeLogStreams",
+#         "logs:PutRetentionPolicy"
+#       ],
+#       "Resource": "arn:aws:logs:ap-northeast-2:<ACCOUNT_ID>:log-group:/eks/eks-demo-cluster/*"
+#     }
+#   ]
+# }
+#
+# AWS CLI 명령:
+#   aws iam create-policy \
+#     --policy-name FluentBitCloudWatchPolicy \
+#     --policy-document file://FluentBitCloudWatchPolicy.json \
+#     --region ap-northeast-2
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 2: IRSA 생성 (eksctl 사용)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# eksctl이 OIDC Provider 연동, IAM Role 생성, ServiceAccount 어노테이션을 한 번에 처리합니다.
+#
+#   eksctl create iamserviceaccount \
+#     --cluster     eks-demo-cluster \
+#     --region      ap-northeast-2 \
+#     --namespace   logging \
+#     --name        fluentbit \
+#     --attach-policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/FluentBitCloudWatchPolicy \
+#     --approve \
+#     --override-existing-serviceaccounts
+#
+# 생성 확인:
+#   kubectl get serviceaccount fluentbit -n logging -o yaml
+#   # annotations 아래에 eks.amazonaws.com/role-arn 이 설정되어 있어야 합니다.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 3: OIDC Provider 확인 (eksctl 없이 수동으로 IRSA를 구성할 경우)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# 클러스터의 OIDC Issuer URL 확인:
+#   aws eks describe-cluster \
+#     --name eks-demo-cluster \
+#     --region ap-northeast-2 \
+#     --query "cluster.identity.oidc.issuer" \
+#     --output text
+#
+# OIDC Provider가 없으면 먼저 생성:
+#   eksctl utils associate-iam-oidc-provider \
+#     --cluster eks-demo-cluster \
+#     --approve
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 4: IAM Role Trust Policy (수동 생성 참고용)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Principal": {
+#         "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/oidc.eks.ap-northeast-2.amazonaws.com/id/<OIDC_ID>"
+#       },
+#       "Action": "sts:AssumeRoleWithWebIdentity",
+#       "Condition": {
+#         "StringEquals": {
+#           "oidc.eks.ap-northeast-2.amazonaws.com/id/<OIDC_ID>:sub":
+#             "system:serviceaccount:logging:fluentbit",
+#           "oidc.eks.ap-northeast-2.amazonaws.com/id/<OIDC_ID>:aud":
+#             "sts.amazonaws.com"
+#         }
+#       }
+#     }
+#   ]
+# }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 5: 권한 동작 검증
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Fluent Bit Pod 내부에서 AWS STS 호출로 IRSA 동작 확인:
+#   kubectl exec -n logging \
+#     $(kubectl get pods -n logging -l app=fluentbit -o jsonpath="{.items[0].metadata.name}") \
+#     -- aws sts get-caller-identity
+#
+# 예상 출력 (IAM Role ARN이 fluentbit role이면 정상):
+#   {
+#     "UserId": "AROAXXXXXXXXXXXXXXXXX:eks-demo-cluster-fluentbit",
+#     "Account": "<ACCOUNT_ID>",
+#     "Arn": "arn:aws:iam::<ACCOUNT_ID>:role/eks-demo-cluster-fluentbit"
+#   }
+#
+# CloudWatch 로그 그룹 생성 여부 확인:
+#   aws logs describe-log-groups \
+#     --log-group-name-prefix /eks/eks-demo-cluster/demo \
+#     --region ap-northeast-2

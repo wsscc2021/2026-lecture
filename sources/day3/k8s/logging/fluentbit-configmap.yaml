@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentbit-config
+  namespace: logging
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Log_Level     info
+        Parsers_File  parsers.conf
+        # 디스크 버퍼 활성화 — CloudWatch API 일시 장애 시 로그 유실 방지
+        storage.path              /var/log/fluentbit-storage
+        storage.sync              normal
+        storage.checksum          off
+        storage.total_limit_size  500M
+
+    # ── INPUT: 노드의 컨테이너 로그 수집 ──────────────────────────────────
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              /var/log/containers/*.log
+        Parser            docker
+        DB                /var/log/fluentbit.db
+        Mem_Buf_Limit     50MB
+        storage.type      filesystem
+        Refresh_Interval  5
+        Skip_Long_Lines   On
+
+    # ── FILTER: Kubernetes 메타데이터 enrichment ──────────────────────────
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Merge_Log           On
+        Merge_Log_Key       log_processed
+        Keep_Log            Off
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude On
+        Annotations         Off
+        Labels              On
+
+    # ── FILTER: demo 네임스페이스만 CloudWatch로 전송 ─────────────────────
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Regex   kubernetes_namespace_name ^demo$
+
+    # ── FILTER: 클러스터 이름 필드 추가 ──────────────────────────────────
+    [FILTER]
+        Name    modify
+        Match   kube.*
+        Add     cluster_name  eks-demo-cluster
+
+    # ── OUTPUT: AWS CloudWatch Logs 전송 ──────────────────────────────────
+    # 로그 그룹 구조:
+    #   /eks/eks-demo-cluster/demo/<app-label>
+    # 로그 스트림:
+    #   <pod-name>/<container-name>
+    [OUTPUT]
+        Name                          cloudwatch_logs
+        Match                         kube.*
+        region                        ap-northeast-2
+        # 앱별 로그 그룹 자동 생성 (kubernetes labels.app 값 사용)
+        log_group_template            /eks/eks-demo-cluster/demo/$kubernetes['labels']['app']
+        log_stream_template           $kubernetes['pod_name']/$kubernetes['container_name']
+        auto_create_group             On
+        # 로그 보존 기간 (일) — 0은 무기한, 운영 환경에서는 명시적으로 설정 권장
+        log_retention_days            30
+        Retry_Limit                   5
+        # 디스크 버퍼 사용
+        storage.total_limit_size      100M
+
+  parsers.conf: |
+    # Docker JSON 로그 파서
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+
+    # Flask/gunicorn 액세스 로그 파서
+    [PARSER]
+        Name        gunicorn_access
+        Format      regex
+        Regex       ^(?<remote_addr>[^ ]+) - - \[(?<time>[^\]]+)\] "(?<method>\w+) (?<path>[^ ]+) [^"]+" (?<status>\d+) (?<bytes_sent>\d+)
+        Time_Key    time
+        Time_Format %d/%b/%Y:%H:%M:%S %z

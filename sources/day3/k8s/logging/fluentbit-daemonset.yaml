@@ -1,0 +1,122 @@
+---
+# Fluent Bit이 K8s API를 읽고 CloudWatch Logs에 쓸 수 있도록 RBAC + IRSA 설정
+#
+# 사전 조건 — IRSA 생성 (cloudwatch-irsa.yaml 참고):
+#   eksctl create iamserviceaccount \
+#     --cluster eks-demo-cluster \
+#     --namespace logging \
+#     --name fluentbit \
+#     --attach-policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/FluentBitCloudWatchPolicy \
+#     --approve
+#
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentbit
+  namespace: logging
+  annotations:
+    # IRSA: EKS Pod Identity로 CloudWatch Logs 권한을 부여하는 IAM 역할 ARN
+    # cloudwatch-irsa.yaml의 eksctl 명령 실행 후 생성된 ARN으로 교체
+    eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/eks-demo-cluster-fluentbit
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluentbit
+rules:
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - pods
+      - pods/logs
+      - nodes
+      - nodes/proxy
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluentbit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluentbit
+subjects:
+  - kind: ServiceAccount
+    name: fluentbit
+    namespace: logging
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentbit
+  namespace: logging
+  labels:
+    app: fluentbit
+spec:
+  selector:
+    matchLabels:
+      app: fluentbit
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: fluentbit
+    spec:
+      serviceAccountName: fluentbit
+      tolerations:
+        # 모든 노드(마스터 포함)에 스케줄되도록 설정
+        - operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: fluentbit
+          image: fluent/fluent-bit:3.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 2020
+              name: http
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 2020
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 2020
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            # 컨테이너 로그 경로 마운트
+            - name: varlog
+              mountPath: /var/log
+            # ConfigMap 마운트
+            - name: fluentbit-config
+              mountPath: /fluent-bit/etc/
+            # 디스크 버퍼용 스토리지
+            - name: fluentbit-storage
+              mountPath: /var/log/fluentbit-storage
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: fluentbit-config
+          configMap:
+            name: fluentbit-config
+        - name: fluentbit-storage
+          hostPath:
+            path: /var/log/fluentbit-storage
+            type: DirectoryOrCreate
